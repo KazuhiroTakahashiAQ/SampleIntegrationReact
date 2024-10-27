@@ -1,10 +1,11 @@
 ﻿using System;
-using System.Threading.Tasks;
 using Rhino;
 using Rhino.PlugIns;
 using Rhino.UI;
 using Eto.Forms;
 using System.Runtime.InteropServices;
+using Rhino.DocObjects;
+using Rhino.Geometry;
 
 namespace SampleIntegrationReact
 {
@@ -40,36 +41,83 @@ namespace SampleIntegrationReact
     public class MyPanel : Panel
     {
         private WebView _webView;
+        private Guid _objectId; // 操作対象のオブジェクトID
+        private BoundingBox _originalBoundingBox; // 元のオブジェクトのバウンディングボックス
+        private double _originalSize; // 元のオブジェクトのサイズ（対角線の長さ）
 
         public MyPanel()
         {
-            // ローカルサーバーのURLを指定します。
+            InitializeComponents();
+
+            // Rhinoのイベントハンドラを設定
+            RhinoDoc.SelectObjects += OnSelectObjects;
+        }
+
+        private void InitializeComponents()
+        {
             var serverUrl = "http://localhost:3000";
 
-            // WebViewを初期化します。
             _webView = new WebView
             {
                 Url = new Uri(serverUrl),
             };
 
-            // WebViewをパネルのコンテンツに設定します。
+            // DocumentTitleChangedイベントをハンドル
+            _webView.DocumentTitleChanged += OnDocumentTitleChanged;
+
             Content = _webView;
         }
 
-
-        // C#からJavaScriptへデータを送信
-        public async Task SendTextToJs(string text)
+        // オブジェクト選択イベントハンドラ
+        private void OnSelectObjects(object sender, RhinoObjectSelectionEventArgs e)
         {
-            var script = $"window.setText('{text}');";
-            await _webView.ExecuteScriptAsync(script);
+            if (e.Selected)
+            {
+                // 最初に選択されたオブジェクトのIDとサイズを保存
+                _objectId = e.RhinoObjects[0].Id;
+                var obj = e.RhinoObjects[0];
+                _originalBoundingBox = obj.Geometry.GetBoundingBox(true);
+                _originalSize = _originalBoundingBox.Diagonal.Length;
+            }
         }
 
-        // JavaScriptからC#へデータを取得
-        public async Task<string> GetTextFromJs()
+        // DocumentTitleChangedイベントでサイズ変更を検知
+        private void OnDocumentTitleChanged(object sender, WebViewTitleEventArgs e)
         {
-            var script = "return window.returnText();";
-            var result = await _webView.ExecuteScriptAsync(script);
-            return result;
+            if (e.Title.StartsWith("size:"))
+            {
+                var sizeStr = e.Title.Substring(5);
+                UpdateObjectSize(sizeStr);
+            }
+        }
+
+        // オブジェクトのサイズを更新
+        private void UpdateObjectSize(string sizeStr)
+        {
+            if (_objectId == Guid.Empty || _originalSize == 0) return;
+
+            if (double.TryParse(sizeStr, out double scaleFactor))
+            {
+                var doc = RhinoDoc.ActiveDoc;
+                var obj = doc.Objects.FindId(_objectId);
+                if (obj != null)
+                {
+                    // 現在のバウンディングボックス
+                    var currentBoundingBox = obj.Geometry.GetBoundingBox(true);
+                    var currentSize = currentBoundingBox.Diagonal.Length;
+
+                    // 必要なスケール倍率を計算
+                    double requiredScale = (scaleFactor * _originalSize) / currentSize;
+
+                    // スケーリングの変換行列を作成
+                    var center = _originalBoundingBox.Center;
+                    var xform = Transform.Scale(center, requiredScale);
+
+                    // オブジェクトをスケーリング
+                    doc.Objects.Transform(_objectId, xform, true);
+                    doc.Views.Redraw();
+                }
+            }
         }
     }
 }
