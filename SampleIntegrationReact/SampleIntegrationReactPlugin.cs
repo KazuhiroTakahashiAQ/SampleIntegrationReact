@@ -78,6 +78,22 @@ namespace SampleIntegrationReact
                 var obj = e.RhinoObjects[0];
                 _originalBoundingBox = obj.Geometry.GetBoundingBox(true);
                 _originalSize = _originalBoundingBox.Diagonal.Length;
+
+                // オブジェクトの名前、レイヤ名、表示色を取得
+                string objectName = obj.Name ?? "";
+                string layerName = obj.Document.Layers[obj.Attributes.LayerIndex].Name;
+                System.Drawing.Color color = obj.Attributes.DrawColor(obj.Document);
+
+                string colorString = $"rgb({color.R}, {color.G}, {color.B})";
+
+                // エスケープ処理
+                string escapedObjectName = EscapeForJavaScript(objectName);
+                string escapedLayerName = EscapeForJavaScript(layerName);
+                string escapedColorString = EscapeForJavaScript(colorString);
+
+                // JavaScriptの関数を呼び出してReact側にデータを送信
+                string script = $"window.updateSelectedObject({{ name: '{escapedObjectName}', layer: '{escapedLayerName}', color: '{escapedColorString}' }});";
+                _webView.ExecuteScriptAsync(script);
             }
         }
 
@@ -94,7 +110,8 @@ namespace SampleIntegrationReact
         // オブジェクトのサイズを更新
         private void UpdateObjectSize(string sizeStr)
         {
-            if (_objectId == Guid.Empty || _originalSize == 0) return;
+            if (_objectId == Guid.Empty || _originalSize == 0)
+                return;
 
             if (double.TryParse(sizeStr, out double scaleFactor))
             {
@@ -118,6 +135,14 @@ namespace SampleIntegrationReact
                     doc.Views.Redraw();
                 }
             }
+        }
+
+        // JavaScript用に文字列をエスケープ
+        private string EscapeForJavaScript(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return "";
+            return s.Replace("\\", "\\\\").Replace("'", "\\'");
         }
     }
 }
