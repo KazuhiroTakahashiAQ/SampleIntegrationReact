@@ -9,7 +9,7 @@ using Rhino.Geometry;
 
 namespace SampleIntegrationReact
 {
-    public class SampleIntegrationReactPlugin : Rhino.PlugIns.PlugIn
+    public class SampleIntegrationReactPlugin : PlugIn
     {
         public SampleIntegrationReactPlugin()
         {
@@ -40,13 +40,14 @@ namespace SampleIntegrationReact
     [Guid("9F96C4A4-87F3-46F6-B29E-B041ABC40F57")]
     public class MyPanel : Panel
     {
-        private WebView _webView;
+        private WebViewAdapter _webViewAdapter;
         private Guid _objectId; // 操作対象のオブジェクトID
         private BoundingBox _originalBoundingBox; // 元のオブジェクトのバウンディングボックス
         private double _originalSize; // 元のオブジェクトのサイズ（対角線の長さ）
 
         public MyPanel()
         {
+            _webViewAdapter = new();
             InitializeComponents();
 
             // Rhinoのイベントハンドラを設定
@@ -55,17 +56,18 @@ namespace SampleIntegrationReact
 
         private void InitializeComponents()
         {
-            var serverUrl = "http://localhost:3000";
-
-            _webView = new WebView
+            _webViewAdapter.Register("UpdateObjectSize", (query) =>
             {
-                Url = new Uri(serverUrl),
-            };
+                // React側からのオブジェクトサイズ更新要求を処理
+                var sizeStr = query["size"];
+                if (!double.TryParse(sizeStr, out double size))
+                {
+                    RhinoApp.WriteLine($"Invalid size value: {sizeStr}");
+                }
+                UpdateObjectSize(size);
+            });
 
-            // DocumentTitleChangedイベントをハンドル
-            _webView.DocumentTitleChanged += OnDocumentTitleChanged;
-
-            Content = _webView;
+            Content = _webViewAdapter.WebView;
         }
 
         // オブジェクト選択イベントハンドラ
@@ -73,76 +75,42 @@ namespace SampleIntegrationReact
         {
             if (e.Selected)
             {
-                // 最初に選択されたオブジェクトのIDとサイズを保存
                 _objectId = e.RhinoObjects[0].Id;
                 var obj = e.RhinoObjects[0];
                 _originalBoundingBox = obj.Geometry.GetBoundingBox(true);
                 _originalSize = _originalBoundingBox.Diagonal.Length;
 
-                // オブジェクトの名前、レイヤ名、表示色を取得
                 string objectName = obj.Name ?? "";
                 string layerName = obj.Document.Layers[obj.Attributes.LayerIndex].Name;
                 System.Drawing.Color color = obj.Attributes.DrawColor(obj.Document);
 
                 string colorString = $"rgb({color.R}, {color.G}, {color.B})";
 
-                // エスケープ処理
-                string escapedObjectName = EscapeForJavaScript(objectName);
-                string escapedLayerName = EscapeForJavaScript(layerName);
-                string escapedColorString = EscapeForJavaScript(colorString);
-
-                // JavaScriptの関数を呼び出してReact側にデータを送信
-                string script = $"window.updateSelectedObject({{ name: '{escapedObjectName}', layer: '{escapedLayerName}', color: '{escapedColorString}' }});";
-                _webView.ExecuteScriptAsync(script);
+                // jsの処理を呼ぶ
+                _webViewAdapter.CallJs("setRhinoProperty", new object[] { objectName, layerName, colorString });
             }
         }
 
-        // DocumentTitleChangedイベントでサイズ変更を検知
-        private void OnDocumentTitleChanged(object sender, WebViewTitleEventArgs e)
+        private void UpdateObjectSize(double size)
         {
-            if (e.Title.StartsWith("size:"))
-            {
-                var sizeStr = e.Title.Substring(5);
-                UpdateObjectSize(sizeStr);
-            }
+            if (_objectId == Guid.Empty) return;
+            if (_originalSize == 0) return;
+
+            var doc = RhinoDoc.ActiveDoc;
+            var obj = doc.Objects.FindId(_objectId);
+            if (obj == null) return;
+
+            var currentBoundingBox = obj.Geometry.GetBoundingBox(true);
+            var currentSize = currentBoundingBox.Diagonal.Length;
+
+            double requiredScale = (size * _originalSize) / currentSize;
+
+            var center = _originalBoundingBox.Center;
+            var xform = Transform.Scale(center, requiredScale);
+
+            doc.Objects.Transform(_objectId, xform, true);
+            doc.Views.Redraw();
         }
 
-        // オブジェクトのサイズを更新
-        private void UpdateObjectSize(string sizeStr)
-        {
-            if (_objectId == Guid.Empty || _originalSize == 0)
-                return;
-
-            if (double.TryParse(sizeStr, out double scaleFactor))
-            {
-                var doc = RhinoDoc.ActiveDoc;
-                var obj = doc.Objects.FindId(_objectId);
-                if (obj != null)
-                {
-                    // 現在のバウンディングボックス
-                    var currentBoundingBox = obj.Geometry.GetBoundingBox(true);
-                    var currentSize = currentBoundingBox.Diagonal.Length;
-
-                    // 必要なスケール倍率を計算
-                    double requiredScale = (scaleFactor * _originalSize) / currentSize;
-
-                    // スケーリングの変換行列を作成
-                    var center = _originalBoundingBox.Center;
-                    var xform = Transform.Scale(center, requiredScale);
-
-                    // オブジェクトをスケーリング
-                    doc.Objects.Transform(_objectId, xform, true);
-                    doc.Views.Redraw();
-                }
-            }
-        }
-
-        // JavaScript用に文字列をエスケープ
-        private string EscapeForJavaScript(string s)
-        {
-            if (string.IsNullOrEmpty(s))
-                return "";
-            return s.Replace("\\", "\\\\").Replace("'", "\\'");
-        }
     }
 }
