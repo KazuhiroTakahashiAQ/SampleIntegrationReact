@@ -1,33 +1,85 @@
-# Getting Started with Create React App
+# Rhino Integration React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+このプロジェクトは、Rhinoと統合するためのReactアプリケーションです。Vite + TypeScriptで構築されています。
 
-## Available Scripts
+## 機能
 
-In the project directory, you can run:
+- RhinoのC#アプリケーションとWebViewを通じて通信
+- リアクティブなUIコンポーネント
+- オブジェクトのプロパティ表示と編集
+- TypeScriptによる型安全なコード
 
-### `npm start`
+## 技術スタック
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- React 18
+- TypeScript
+- Vite
+- Vitest (テスト)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 開発環境のセットアップ
 
-### `npm test`
+### 必要条件
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- Node.js 16.x以上
+- npm 7.x以上
+
+### インストール
+
+```bash
+# 依存関係のインストール
+npm install
+```
+
+## 利用可能なスクリプト
+
+プロジェクトディレクトリで以下のコマンドを実行できます：
+
+### `npm run dev`
+
+開発モードでアプリを実行します。\
+[http://localhost:5173](http://localhost:5173) を開いてブラウザで表示します。
+
+コードを変更すると、ページは自動的にリロードされます。
 
 ### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+本番用にアプリをビルドし、`build`フォルダに出力します。\
+高いパフォーマンスのために最適化された本番モードでReactをバンドルします。
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+ビルドはミニファイされ、ファイル名にはハッシュが含まれます。\
+アプリはデプロイする準備ができています！
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### `npm run lint`
+
+ESLintを使用してコードをリントします。
+
+### `npm run test`
+
+インタラクティブなウォッチモードでテストランナーを起動します。
+
+### `npm run test:run`
+
+すべてのテストを一度だけ実行します。
+
+### `npm run coverage`
+
+コードカバレッジレポートを生成します。
+
+## Rhinoとの統合
+
+このアプリケーションは、Rhinoと以下の方法で通信します：
+
+1. **C#からJavaScriptへの呼び出し**: `window.hostFunc`名前空間に登録された関数を通じて、C#側からJavaScriptの関数を呼び出します。
+2. **JavaScriptからC#への呼び出し**: `rhino://`プロトコルを使用して、JavaScriptからC#メソッドを呼び出します。
+
+## プロジェクト構造
+
+- `src/` - ソースコード
+  - `App.tsx` - メインのReactコンポーネント
+  - `hostCall.ts` - C#への呼び出しを処理するユーティリティ
+  - `hostEvent.ts` - C#からの呼び出しを処理するユーティリティ
+- `public/` - 静的なアセット
+- `build/` - ビルド成果物
 
 ### `npm run eject`
 
