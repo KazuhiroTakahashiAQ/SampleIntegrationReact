@@ -56,6 +56,7 @@ namespace SampleIntegrationReact
 
         private void InitializeComponents()
         {
+            // Reactから実行される関数の登録
             _webViewAdapter.Register("UpdateObjectSize", (query) =>
             {
                 // React側からのオブジェクトサイズ更新要求を処理
