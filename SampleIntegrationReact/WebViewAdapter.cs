@@ -22,7 +22,7 @@ namespace SampleIntegrationReact
 
         public WebViewAdapter()
         {
-            var serverUrl = "http://localhost:3000";
+            var serverUrl = "http://localhost:5173";
 
             _webView = new WebView
             {
